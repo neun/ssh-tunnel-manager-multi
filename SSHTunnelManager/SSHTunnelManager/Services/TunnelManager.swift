@@ -10,8 +10,8 @@ private let pidFileURL: URL = {
     return appFolder.appendingPathComponent("active_pids.txt")
 }()
 
-/// Process group ID for all SSH child processes
-nonisolated(unsafe) private var sshProcessGroupID: pid_t = 0
+/// Process group ID for all SSH child processes (accessed from signal handlers, so must be global)
+private var sshProcessGroupID: pid_t = 0
 
 /// Kill SSH processes using specified local port
 private func findAndKillSSHProcesses(localPort: Int) {

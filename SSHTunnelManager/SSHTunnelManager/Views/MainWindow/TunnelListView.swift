@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct TunnelListView: View {
     @Environment(TunnelManager.self) private var tunnelManager
     @Binding var selection: Tunnel?
@@ -29,7 +30,6 @@ struct TunnelListView: View {
         }
     }
 
-    @MainActor
     private func deleteTunnels(at offsets: IndexSet) {
         for index in offsets {
             let tunnel = tunnelManager.tunnels[index]
@@ -41,6 +41,7 @@ struct TunnelListView: View {
     }
 }
 
+@MainActor
 struct TunnelRow: View {
     let tunnel: Tunnel
     @Environment(TunnelManager.self) private var tunnelManager

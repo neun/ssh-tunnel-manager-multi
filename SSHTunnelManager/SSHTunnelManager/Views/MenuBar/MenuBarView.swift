@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct MenuBarView: View {
     @Environment(TunnelManager.self) private var tunnelManager
     @Environment(\.openWindow) private var openWindow
@@ -60,11 +61,11 @@ struct MenuBarView: View {
     }
 }
 
+@MainActor
 struct TunnelMenuItem: View {
     let tunnel: Tunnel
     @Environment(TunnelManager.self) private var tunnelManager
 
-    @MainActor
     private var status: ConnectionStatus {
         tunnelManager.status(for: tunnel)
     }
