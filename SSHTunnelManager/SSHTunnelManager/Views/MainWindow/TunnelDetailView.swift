@@ -50,7 +50,11 @@ struct TunnelDetailView: View {
                     Spacer()
 
                     Button(status != .disconnected ? "Disconnect" : "Connect") {
-                        tunnelManager.toggle(tunnel: tunnel)
+                        // Save any pending changes before toggling
+                        if hasChanges {
+                            saveChanges()
+                        }
+                        tunnelManager.toggle(tunnel: editedTunnel)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(status != .disconnected ? .red : .green)
@@ -175,6 +179,11 @@ struct TunnelDetailView: View {
         .scrollContentBackground(.hidden)
         .padding(.horizontal)
         .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Clear focus when tapping empty space, which triggers auto-save
+            focusedField = nil
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Save") {

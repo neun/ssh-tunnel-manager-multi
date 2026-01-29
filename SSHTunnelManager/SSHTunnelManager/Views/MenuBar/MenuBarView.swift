@@ -57,7 +57,8 @@ struct MenuBarView: View {
             .buttonStyle(.plain)
         }
         .padding(.vertical, 8)
-        .frame(width: 220)
+        .frame(minWidth: 280, maxWidth: 400)
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
@@ -89,8 +90,10 @@ struct TunnelMenuItem: View {
                 .frame(width: 8, height: 8)
 
             Text(tunnel.name)
+                .lineLimit(1)
+                .truncationMode(.tail)
 
-            Spacer()
+            Spacer(minLength: 8)
 
             Text(":\(tunnel.localPort)")
                 .foregroundStyle(.secondary)
