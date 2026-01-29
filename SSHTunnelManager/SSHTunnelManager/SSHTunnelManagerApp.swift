@@ -11,7 +11,7 @@ struct SSHTunnelManagerApp: App {
             MenuBarView()
                 .environment(appDelegate.tunnelManager)
         } label: {
-            Image(systemName: "network")
+            Image(systemName: "point.3.connected.trianglepath.dotted")
         }
         .menuBarExtraStyle(.window)
 

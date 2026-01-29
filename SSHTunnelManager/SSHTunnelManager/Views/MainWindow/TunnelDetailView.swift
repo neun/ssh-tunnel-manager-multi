@@ -10,7 +10,7 @@ struct TunnelDetailView: View {
     @State private var hasChanges = false
 
     enum Field: Hashable {
-        case name, host, port, identityFile, localHost, localPort, remoteHost, remotePort
+        case name, host, port, identityFile, localHost, localPort, remoteHost, remotePort, alias
     }
 
     init(tunnel: Tunnel) {
@@ -70,32 +70,51 @@ struct TunnelDetailView: View {
             }
 
             Section {
-                LabeledContent("Host") {
-                    HStack(spacing: 4) {
-                        TextField("user@server.com", text: $editedTunnel.host)
-                            .textFieldStyle(.roundedBorder)
-                            .labelsHidden()
-                            .focused($focusedField, equals: .host)
-                        Text(":")
-                            .foregroundStyle(.secondary)
-                        TextField("", value: $editedTunnel.port, format: .number)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 70)
-                            .labelsHidden()
-                            .focused($focusedField, equals: .port)
-                    }
+                Picker("Mode", selection: $editedTunnel.useAlias) {
+                    Text("Host").tag(false)
+                    Text("SSH Alias").tag(true)
                 }
+                .pickerStyle(.segmented)
 
-                TextField("Identity File (optional)", text: Binding(
-                    get: { editedTunnel.identityFile ?? "" },
-                    set: { editedTunnel.identityFile = $0.isEmpty ? nil : $0 }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .focused($focusedField, equals: .identityFile)
+                if editedTunnel.useAlias {
+                    LabeledContent("Alias") {
+                        TextField("my-server", text: $editedTunnel.host)
+                            .textFieldStyle(.roundedBorder)
+                            .labelsHidden()
+                            .focused($focusedField, equals: .alias)
+                    }
 
-                Text("e.g., ~/.ssh/id_rsa")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text("Uses ~/.ssh/config alias (no -i flag needed)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    LabeledContent("Host") {
+                        HStack(spacing: 4) {
+                            TextField("user@server.com", text: $editedTunnel.host)
+                                .textFieldStyle(.roundedBorder)
+                                .labelsHidden()
+                                .focused($focusedField, equals: .host)
+                            Text(":")
+                                .foregroundStyle(.secondary)
+                            TextField("", value: $editedTunnel.port, format: .number)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 70)
+                                .labelsHidden()
+                                .focused($focusedField, equals: .port)
+                        }
+                    }
+
+                    TextField("Identity File (optional)", text: Binding(
+                        get: { editedTunnel.identityFile ?? "" },
+                        set: { editedTunnel.identityFile = $0.isEmpty ? nil : $0 }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focusedField, equals: .identityFile)
+
+                    Text("e.g., ~/.ssh/id_rsa")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text("SSH Connection")
             }
@@ -163,15 +182,6 @@ struct TunnelDetailView: View {
                 }
                 .disabled(!hasChanges)
             }
-
-            ToolbarItem(placement: .destructiveAction) {
-                Button {
-                    tunnelManager.deleteTunnel(tunnel)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .help("Delete tunnel")
-            }
         }
         .onChange(of: editedTunnel) { _, _ in
             hasChanges = true
@@ -195,11 +205,19 @@ struct TunnelDetailView: View {
 
     private func sshCommand(for tunnel: Tunnel) -> String {
         var cmd = "ssh -N -L \(tunnel.localHost):\(tunnel.localPort):\(tunnel.remoteHost):\(tunnel.remotePort)"
-        if tunnel.port != 22 {
-            cmd += " -p \(tunnel.port)"
-        }
-        if let identityFile = tunnel.identityFile, !identityFile.isEmpty {
-            cmd += " -i \(identityFile)"
+        if tunnel.useAlias {
+            // For alias mode, only add -p if not default port
+            if tunnel.port != 22 {
+                cmd += " -p \(tunnel.port)"
+            }
+        } else {
+            // For host mode, always add -p and optionally -i
+            if tunnel.port != 22 {
+                cmd += " -p \(tunnel.port)"
+            }
+            if let identityFile = tunnel.identityFile, !identityFile.isEmpty {
+                cmd += " -i \(identityFile)"
+            }
         }
         cmd += " \(tunnel.host)"
         return cmd

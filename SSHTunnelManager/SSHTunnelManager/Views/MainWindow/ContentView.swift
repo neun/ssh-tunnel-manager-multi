@@ -8,15 +8,87 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            TunnelListView(selection: $selectedTunnel)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
+            VStack(spacing: 0) {
+                TunnelListView(selection: $selectedTunnel)
+
+                Divider()
+
+                // Action bar for selected tunnel
+                if let tunnel = selectedTunnel {
+                    HStack(spacing: 12) {
+                        Button {
+                            tunnelManager.moveTunnelUp(tunnel)
+                        } label: {
+                            Image(systemName: "arrow.up")
+                        }
+                        .disabled(!canMoveUp(tunnel))
+                        .help("Move Up")
+
+                        Button {
+                            tunnelManager.moveTunnelDown(tunnel)
+                        } label: {
+                            Image(systemName: "arrow.down")
+                        }
+                        .disabled(!canMoveDown(tunnel))
+                        .help("Move Down")
+
+                        Divider()
+                            .frame(height: 16)
+
+                        Button {
+                            let clone = tunnelManager.cloneTunnel(tunnel)
+                            selectedTunnel = clone
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .help("Clone")
+
+                        Spacer()
+
+                        Button(role: .destructive) {
+                            selectedTunnel = nil
+                            tunnelManager.deleteTunnel(tunnel)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .help("Delete")
+                    }
+                    .buttonStyle(.borderless)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+
+                    Divider()
+                }
+
+                HStack {
+                    Toggle("Launch at Login", isOn: $launchAtLogin)
+                        .toggleStyle(.checkbox)
+                        .font(.caption)
+                        .onChange(of: launchAtLogin) { _, newValue in
+                            do {
+                                if newValue {
+                                    try SMAppService.mainApp.register()
+                                } else {
+                                    try SMAppService.mainApp.unregister()
+                                }
+                            } catch {
+                                print("Failed to update login item: \(error)")
+                                launchAtLogin = !newValue
+                            }
+                        }
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
+            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
         } detail: {
             if let tunnel = selectedTunnel,
                tunnelManager.tunnels.contains(where: { $0.id == tunnel.id }) {
                 TunnelDetailView(tunnel: tunnel)
             } else {
                 ContentUnavailableView {
-                    Label("No Tunnel Selected", systemImage: "network")
+                    Label("No Tunnel Selected", systemImage: "point.3.connected.trianglepath.dotted")
                 } description: {
                     Text("Select a tunnel from the sidebar or create a new one.")
                 } actions: {
@@ -37,27 +109,16 @@ struct ContentView: View {
                 selectedTunnel = updated
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Menu {
-                    Toggle("Launch at Login", isOn: $launchAtLogin)
-                        .onChange(of: launchAtLogin) { _, newValue in
-                            do {
-                                if newValue {
-                                    try SMAppService.mainApp.register()
-                                } else {
-                                    try SMAppService.mainApp.unregister()
-                                }
-                            } catch {
-                                print("Failed to update login item: \(error)")
-                                launchAtLogin = !newValue
-                            }
-                        }
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-            }
-        }
+    }
+
+    private func canMoveUp(_ tunnel: Tunnel) -> Bool {
+        guard let index = tunnelManager.tunnels.firstIndex(where: { $0.id == tunnel.id }) else { return false }
+        return index > 0
+    }
+
+    private func canMoveDown(_ tunnel: Tunnel) -> Bool {
+        guard let index = tunnelManager.tunnels.firstIndex(where: { $0.id == tunnel.id }) else { return false }
+        return index < tunnelManager.tunnels.count - 1
     }
 }
 

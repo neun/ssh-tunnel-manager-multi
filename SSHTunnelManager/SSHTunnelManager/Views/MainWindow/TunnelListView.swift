@@ -10,8 +10,44 @@ struct TunnelListView: View {
             ForEach(tunnelManager.tunnels) { tunnel in
                 TunnelRow(tunnel: tunnel)
                     .tag(tunnel)
+                    .contextMenu {
+                        Button {
+                            tunnelManager.moveTunnelUp(tunnel)
+                        } label: {
+                            Label("Move Up", systemImage: "arrow.up")
+                        }
+                        .disabled(!canMoveUp(tunnel))
+
+                        Button {
+                            tunnelManager.moveTunnelDown(tunnel)
+                        } label: {
+                            Label("Move Down", systemImage: "arrow.down")
+                        }
+                        .disabled(!canMoveDown(tunnel))
+
+                        Divider()
+
+                        Button {
+                            let clone = tunnelManager.cloneTunnel(tunnel)
+                            selection = clone
+                        } label: {
+                            Label("Clone", systemImage: "doc.on.doc")
+                        }
+
+                        Divider()
+
+                        Button(role: .destructive) {
+                            if selection?.id == tunnel.id {
+                                selection = nil
+                            }
+                            tunnelManager.deleteTunnel(tunnel)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
             }
             .onDelete(perform: deleteTunnels)
+            .onMove(perform: moveTunnels)
         }
         .listStyle(.sidebar)
         .toolbar {
@@ -30,6 +66,16 @@ struct TunnelListView: View {
         }
     }
 
+    private func canMoveUp(_ tunnel: Tunnel) -> Bool {
+        guard let index = tunnelManager.tunnels.firstIndex(where: { $0.id == tunnel.id }) else { return false }
+        return index > 0
+    }
+
+    private func canMoveDown(_ tunnel: Tunnel) -> Bool {
+        guard let index = tunnelManager.tunnels.firstIndex(where: { $0.id == tunnel.id }) else { return false }
+        return index < tunnelManager.tunnels.count - 1
+    }
+
     private func deleteTunnels(at offsets: IndexSet) {
         for index in offsets {
             let tunnel = tunnelManager.tunnels[index]
@@ -38,6 +84,10 @@ struct TunnelListView: View {
             }
             tunnelManager.deleteTunnel(tunnel)
         }
+    }
+
+    private func moveTunnels(from source: IndexSet, to destination: Int) {
+        tunnelManager.moveTunnel(from: source, to: destination)
     }
 }
 

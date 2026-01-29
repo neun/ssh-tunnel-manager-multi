@@ -194,15 +194,22 @@ class TunnelManager {
             "-N",
             "-L", "\(tunnel.localHost):\(tunnel.localPort):\(tunnel.remoteHost):\(tunnel.remotePort)",
             tunnel.host,
-            "-p", "\(tunnel.port)",
             "-o", "ExitOnForwardFailure=yes",
             "-o", "ServerAliveInterval=30",
             "-o", "ServerAliveCountMax=3"
         ]
 
-        if let identityFile = tunnel.identityFile, !identityFile.isEmpty {
-            let expandedPath = (identityFile as NSString).expandingTildeInPath
-            arguments.insert(contentsOf: ["-i", expandedPath], at: 1)
+        // When using alias, skip -p for default port 22 and skip -i entirely
+        if tunnel.useAlias {
+            if tunnel.port != 22 {
+                arguments.insert(contentsOf: ["-p", "\(tunnel.port)"], at: 3)
+            }
+        } else {
+            arguments.insert(contentsOf: ["-p", "\(tunnel.port)"], at: 3)
+            if let identityFile = tunnel.identityFile, !identityFile.isEmpty {
+                let expandedPath = (identityFile as NSString).expandingTildeInPath
+                arguments.insert(contentsOf: ["-i", expandedPath], at: 1)
+            }
         }
 
         process.arguments = arguments
@@ -312,6 +319,34 @@ class TunnelManager {
             tunnels[index] = tunnel
             Task { await saveTunnels() }
         }
+    }
+
+    func moveTunnel(from source: IndexSet, to destination: Int) {
+        tunnels.move(fromOffsets: source, toOffset: destination)
+        Task { await saveTunnels() }
+    }
+
+    func moveTunnelUp(_ tunnel: Tunnel) {
+        guard let index = tunnels.firstIndex(where: { $0.id == tunnel.id }),
+              index > 0 else { return }
+        tunnels.swapAt(index, index - 1)
+        Task { await saveTunnels() }
+    }
+
+    func moveTunnelDown(_ tunnel: Tunnel) {
+        guard let index = tunnels.firstIndex(where: { $0.id == tunnel.id }),
+              index < tunnels.count - 1 else { return }
+        tunnels.swapAt(index, index + 1)
+        Task { await saveTunnels() }
+    }
+
+    func cloneTunnel(_ tunnel: Tunnel) -> Tunnel {
+        var clone = tunnel
+        clone.id = UUID()
+        clone.name = "\(tunnel.name) (Copy)"
+        tunnels.append(clone)
+        Task { await saveTunnels() }
+        return clone
     }
 
     /// Disconnect all tunnels - called on app termination
