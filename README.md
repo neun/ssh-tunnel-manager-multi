@@ -36,6 +36,8 @@ This app solves that. Configure once, connect with one click.
 - **SOCKS proxy** — per-mapping dynamic forwarding (`ssh -D`), mixable with local forwards
 - **Group tunnels** — organize them with dividers and flip a whole group with one toggle
 - **Auto-reconnect** — tunnels automatically reconnect when they drop
+- **Connect/disconnect alerts** — optional sound and notification when a tunnel drops or comes back
+- **Per-tunnel tuning** — override SSH `ConnectTimeout` / keepalive settings where a host needs it
 - **SSH config aliases** — reuse hosts from your `~/.ssh/config`
 - **Launch at login** — start tunnels when your Mac boots
 - **Auto-connect** — mark tunnels to connect automatically on app launch
