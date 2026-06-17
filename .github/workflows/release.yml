@@ -28,6 +28,12 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
+      - name: Ad-hoc sign
+        run: |
+          APP=SSHTunnelManager/build/Build/Products/Release/SSHTunnelManager.app
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --verbose "$APP"
+
       - name: Create DMG
         run: |
           mkdir -p dist

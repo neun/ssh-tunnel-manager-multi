@@ -11,9 +11,7 @@ private let logger = Logger(
 struct ContentView: View {
     @Environment(TunnelManager.self) private var tunnelManager
     @State private var selectedID: UUID?
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    @State private var soundsEnabled = TunnelSound.isEnabled
-    @State private var notificationsEnabled = TunnelNotification.isEnabled
+    @State private var showPreferences = false
 
     private var selectedItem: SidebarItem? {
         guard let id = selectedID else { return nil }
@@ -76,44 +74,18 @@ struct ContentView: View {
                 }
 
                 HStack {
-                    Toggle("Launch at Login", isOn: $launchAtLogin)
-                        .toggleStyle(.checkbox)
-                        .font(.caption)
-                        .onChange(of: launchAtLogin) { _, newValue in
-                            do {
-                                if newValue {
-                                    try SMAppService.mainApp.register()
-                                } else {
-                                    try SMAppService.mainApp.unregister()
-                                }
-                            } catch {
-                                logger.error("Failed to update login item: \(error.localizedDescription, privacy: .public)")
-                                launchAtLogin = !newValue
-                            }
-                        }
+                    Button {
+                        showPreferences.toggle()
+                    } label: {
+                        Label("Preferences", systemImage: "gearshape")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                    .popover(isPresented: $showPreferences, arrowEdge: .bottom) {
+                        AppPreferencesView()
+                    }
 
                     Spacer()
-
-                    Toggle("Play Sounds", isOn: $soundsEnabled)
-                        .toggleStyle(.checkbox)
-                        .font(.caption)
-                        .onChange(of: soundsEnabled) { _, newValue in
-                            TunnelSound.isEnabled = newValue
-                        }
-
-                    Spacer()
-
-                    Toggle("Show Notifications", isOn: $notificationsEnabled)
-                        .toggleStyle(.checkbox)
-                        .font(.caption)
-                        .onChange(of: notificationsEnabled) { _, newValue in
-                            TunnelNotification.isEnabled = newValue
-                            if newValue {
-                                // Covers the case where the user enables this
-                                // after declining the initial launch-time prompt.
-                                TunnelNotification.requestAuthorizationIfNeeded()
-                            }
-                        }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -205,6 +177,55 @@ struct DividerDetailView: View {
     private func save() {
         guard name != divider.title else { return }
         tunnelManager.renameDivider(divider.id, title: name)
+    }
+}
+
+/// App-level preferences shown in a popover from the sidebar footer, so the
+/// always-visible UI stays a single button instead of a row of checkboxes.
+@MainActor
+struct AppPreferencesView: View {
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var soundsEnabled = TunnelSound.isEnabled
+    @State private var notificationsEnabled = TunnelNotification.isEnabled
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Preferences")
+                .font(.headline)
+
+            Toggle("Launch at Login", isOn: $launchAtLogin)
+                .onChange(of: launchAtLogin) { _, newValue in
+                    do {
+                        if newValue {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                    } catch {
+                        logger.error("Failed to update login item: \(error.localizedDescription, privacy: .public)")
+                        launchAtLogin = !newValue
+                    }
+                }
+
+            Divider()
+
+            Toggle("Play a sound on connect / disconnect", isOn: $soundsEnabled)
+                .onChange(of: soundsEnabled) { _, newValue in
+                    TunnelSound.isEnabled = newValue
+                }
+
+            Toggle("Show a notification on connect / disconnect", isOn: $notificationsEnabled)
+                .onChange(of: notificationsEnabled) { _, newValue in
+                    TunnelNotification.isEnabled = newValue
+                    if newValue {
+                        // Request permission only when the user opts in, not at launch.
+                        TunnelNotification.requestAuthorizationIfNeeded()
+                    }
+                }
+        }
+        .toggleStyle(.checkbox)
+        .padding(16)
+        .frame(width: 300, alignment: .leading)
     }
 }
 

@@ -1,5 +1,6 @@
 import SwiftUI
 import Darwin
+import UserNotifications
 
 @main
 struct SSHTunnelManagerApp: App {
@@ -36,7 +37,7 @@ struct SSHTunnelManagerApp: App {
 }
 
 @MainActor
-class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUserNotificationCenterDelegate {
     let tunnelManager = TunnelManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -45,10 +46,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Disable Sudden Termination - ensures cleanup handlers run
         ProcessInfo.processInfo.disableSuddenTermination()
 
-        // Ask for notification permission up front. This is a no-op prompt
-        // if the user never enables "Show Notifications" in settings, and
-        // the system only asks once regardless of how often this is called.
-        TunnelNotification.requestAuthorizationIfNeeded()
+        // Deliver connect/disconnect notifications as banners even while the app
+        // is the active app (otherwise the system suppresses foreground alerts).
+        UNUserNotificationCenter.current().delegate = self
 
         // Register for additional termination signals
         setupSignalHandlers()
@@ -99,6 +99,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 exit(0)
             }
         }
+    }
+
+    // Show notifications as banners even when this app is frontmost.
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .list])
     }
 
     func applicationWillTerminate(_ notification: Notification) {

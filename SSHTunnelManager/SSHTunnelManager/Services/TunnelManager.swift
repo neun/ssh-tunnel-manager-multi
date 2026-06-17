@@ -121,6 +121,25 @@ private func findAndKillSSHProcesses(localPort: Int) {
     task.waitUntilExit()
 }
 
+/// Whether something is accepting TCP connections on 127.0.0.1:port. ssh binds a
+/// forward's local port only once the connection actually succeeds, so this is
+/// used to detect when a tunnel is genuinely up.
+private func isLocalPortOpen(_ port: Int) -> Bool {
+    let fd = socket(AF_INET, SOCK_STREAM, 0)
+    guard fd >= 0 else { return false }
+    defer { close(fd) }
+    var addr = sockaddr_in()
+    addr.sin_family = sa_family_t(AF_INET)
+    addr.sin_port = in_port_t(UInt16(truncatingIfNeeded: port)).bigEndian
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+    let rc = withUnsafePointer(to: &addr) { ptr in
+        ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+            connect(fd, sa, socklen_t(MemoryLayout<sockaddr_in>.size))
+        }
+    }
+    return rc == 0
+}
+
 /// Kill processes by PIDs from file (cleanup from previous session)
 private func killOrphanedProcesses() {
     guard FileManager.default.fileExists(atPath: pidFileURL.path) else { return }
@@ -162,6 +181,7 @@ class TunnelManager {
     private var connectionStatus: [UUID: ConnectionStatus] = [:]
     private var shouldBeConnected: Set<UUID> = [] // Tracks desired state for reconnection
     private var connectingInFlight: Set<UUID> = [] // Tunnels whose SSH process is mid-startup
+    private var establishedTunnels: Set<UUID> = [] // Connections that survived the grace period (gates feedback)
     private let configStore = ConfigStore()
     private var reconnectTask: Task<Void, Never>?
 
@@ -345,13 +365,35 @@ class TunnelManager {
             let pid = process.processIdentifier
             processIDs[tunnel.id] = pid
             connectionStatus[tunnel.id] = .connected
-            TunnelSound.playConnected()
-            TunnelNotification.notifyConnected(tunnelName: tunnel.name)
 
             // Save PIDs to file for crash recovery
             updatePIDFile()
 
             let tunnelID = tunnel.id
+            let tunnelName = tunnel.name
+
+            // Announce the connection only once the forward is genuinely up:
+            // poll the local port (ssh binds it only on success), so the cue
+            // fires promptly on a fast connect, never on a host that just hangs,
+            // and not during a reconnect storm. Surviving this also marks the
+            // tunnel "established", which gates the disconnect feedback below.
+            let localPort = tunnel.portMappings.first?.localPort
+            Task { [weak self] in
+                guard let localPort else { return }
+                for _ in 0..<150 { // up to ~30s while the process stays alive
+                    try? await Task.sleep(for: .milliseconds(200))
+                    let isUp = await Task.detached { isLocalPortOpen(localPort) }.value
+                    guard let self, self.processIDs[tunnelID] == pid else { return }
+                    if isUp {
+                        if self.establishedTunnels.insert(tunnelID).inserted {
+                            TunnelSound.playConnected()
+                            TunnelNotification.notifyConnected(tunnelName: tunnelName)
+                        }
+                        return
+                    }
+                }
+            }
+
             Task.detached { [weak self] in
                 process.waitUntilExit()
                 await MainActor.run { [weak self] in
@@ -375,16 +417,22 @@ class TunnelManager {
 
     private func handleProcessTermination(tunnelID: UUID) {
         processIDs.removeValue(forKey: tunnelID)
-        let tunnelName = tunnels.first(where: { $0.id == tunnelID })?.name ?? "Tunnel"
+        let wasEstablished = establishedTunnels.remove(tunnelID) != nil
         // If should still be connected, mark as connecting (will trigger reconnect)
         // Otherwise mark as disconnected
         if shouldBeConnected.contains(tunnelID) {
             connectionStatus[tunnelID] = .connecting
+            // Announce only genuine drops of connections that were actually up.
+            // A manual disconnect clears shouldBeConnected first (silent), and a
+            // flap never became "established" (silent) — so no nuisance beeps.
+            if wasEstablished {
+                let tunnelName = tunnels.first(where: { $0.id == tunnelID })?.name ?? "Tunnel"
+                TunnelSound.playDisconnected()
+                TunnelNotification.notifyDisconnected(tunnelName: tunnelName)
+            }
         } else {
             connectionStatus[tunnelID] = .disconnected
         }
-        TunnelSound.playDisconnected()
-        TunnelNotification.notifyDisconnected(tunnelName: tunnelName)
         updatePIDFile()
     }
 
@@ -392,6 +440,7 @@ class TunnelManager {
         // Remove from auto-reconnect set and cancel any in-flight startup
         shouldBeConnected.remove(tunnel.id)
         connectingInFlight.remove(tunnel.id)
+        establishedTunnels.remove(tunnel.id)
 
         guard let pid = processIDs[tunnel.id] else {
             connectionStatus[tunnel.id] = .disconnected
@@ -559,6 +608,7 @@ class TunnelManager {
         reconnectTask = nil
         shouldBeConnected.removeAll()
         connectingInFlight.removeAll()
+        establishedTunnels.removeAll()
 
         let pids = Array(processIDs.values)
 

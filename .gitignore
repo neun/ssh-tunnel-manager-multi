@@ -3,6 +3,7 @@ build/
 DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
+**/xcuserdata/
 *.xcuserstate
 
 # macOS
@@ -18,3 +19,6 @@ DerivedData/
 # Build artifacts
 *.dmg
 dist/
+
+# JetBrains
+.idea/

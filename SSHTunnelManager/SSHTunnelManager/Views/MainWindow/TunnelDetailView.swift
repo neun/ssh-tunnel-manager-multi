@@ -157,58 +157,49 @@ struct TunnelDetailView: View {
             Section {
                 LabeledContent("Connect Timeout") {
                     HStack(spacing: 4) {
-                        TextField(
-                            "default",
-                            value: Binding(
-                                get: { editedTunnel.connectTimeout ?? 0 },
-                                set: { editedTunnel.connectTimeout = $0 > 0 ? $0 : nil }
-                            ),
-                            format: .number.grouping(.never)
-                        )
+                        TextField("Connect Timeout", text: Binding(
+                            get: { editedTunnel.connectTimeout.map(String.init) ?? "" },
+                            set: { editedTunnel.connectTimeout = Int($0) }
+                        ), prompt: Text("off"))
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
                         .frame(width: 70)
                         .focused($focusedField, equals: .connectTimeout)
+                        .help("Seconds ssh waits to establish the connection before giving up. Blank = wait indefinitely.")
                         Text("sec").foregroundStyle(.secondary)
                     }
                 }
 
                 LabeledContent("Alive Interval") {
                     HStack(spacing: 4) {
-                        TextField(
-                            "\(Tunnel.defaultServerAliveInterval)",
-                            value: Binding(
-                                get: { editedTunnel.serverAliveInterval ?? 0 },
-                                set: { editedTunnel.serverAliveInterval = $0 > 0 ? $0 : nil }
-                            ),
-                            format: .number.grouping(.never)
-                        )
+                        TextField("Alive Interval", text: Binding(
+                            get: { editedTunnel.serverAliveInterval.map(String.init) ?? "" },
+                            set: { editedTunnel.serverAliveInterval = Int($0) }
+                        ), prompt: Text("\(Tunnel.defaultServerAliveInterval)"))
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
                         .frame(width: 70)
                         .focused($focusedField, equals: .aliveInterval)
+                        .help("Seconds between keepalive probes that detect a dead connection. Blank uses the default (\(Tunnel.defaultServerAliveInterval)).")
                         Text("sec").foregroundStyle(.secondary)
                     }
                 }
 
                 LabeledContent("Alive Count Max") {
-                    TextField(
-                        "\(Tunnel.defaultServerAliveCountMax)",
-                        value: Binding(
-                            get: { editedTunnel.serverAliveCountMax ?? 0 },
-                            set: { editedTunnel.serverAliveCountMax = $0 > 0 ? $0 : nil }
-                        ),
-                        format: .number.grouping(.never)
-                    )
+                    TextField("Alive Count Max", text: Binding(
+                        get: { editedTunnel.serverAliveCountMax.map(String.init) ?? "" },
+                        set: { editedTunnel.serverAliveCountMax = Int($0) }
+                    ), prompt: Text("\(Tunnel.defaultServerAliveCountMax)"))
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
                     .frame(width: 70)
                     .focused($focusedField, equals: .aliveCountMax)
+                    .help("Drop the connection after this many missed keepalive probes. Blank uses the default (\(Tunnel.defaultServerAliveCountMax)).")
                 }
             } header: {
                 Text("Connection Resilience")
             } footer: {
-                Text("Leave blank to use the app default (Alive Interval 30s, Alive Count Max 3). ConnectTimeout has no default — ssh waits indefinitely unless set.")
+                Text("A blank field uses its placeholder default; hover a field for what it does. Connect Timeout is off unless set.")
             }
 
             if status == .connected {

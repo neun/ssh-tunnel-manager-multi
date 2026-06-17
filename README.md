@@ -89,6 +89,12 @@ Use `socks5h://` when DNS should be resolved **on the server** — e.g. to reach
 curl -x socks5h://127.0.0.1:1080 http://internal-host:8080
 ```
 
+### Connection alerts
+
+The app can play a sound and/or show a notification when a tunnel connects or drops unexpectedly. Toggle them in **Preferences** (the gear in the sidebar footer) — sounds are on by default, notifications off. Manual disconnects and config edits stay silent; only genuine drops alert.
+
+Notifications need macOS permission. Turning **Show Notifications** on prompts for it the first time. If notifications still don't appear, open **System Settings → Notifications → SSH Tunnel Manager** and make sure **Allow Notifications** is on — for an unsigned build you may have to enable it there by hand.
+
 ## License
 
 MIT
