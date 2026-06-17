@@ -12,6 +12,7 @@ struct ContentView: View {
     @Environment(TunnelManager.self) private var tunnelManager
     @State private var selectedID: UUID?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var soundsEnabled = TunnelSound.isEnabled
 
     private var selectedItem: SidebarItem? {
         guard let id = selectedID else { return nil }
@@ -89,7 +90,15 @@ struct ContentView: View {
                                 launchAtLogin = !newValue
                             }
                         }
+
                     Spacer()
+
+                    Toggle("Play Sounds", isOn: $soundsEnabled)
+                        .toggleStyle(.checkbox)
+                        .font(.caption)
+                        .onChange(of: soundsEnabled) { _, newValue in
+                            TunnelSound.isEnabled = newValue
+                        }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)

@@ -1,12 +1,38 @@
 import Foundation
 import SwiftUI
 import Darwin
+import AppKit
 import os
 
 private let logger = Logger(
     subsystem: Bundle.main.bundleIdentifier ?? "SSHTunnelManager",
     category: "TunnelManager"
 )
+
+/// Plays the connect/disconnect feedback sounds, gated by a user preference.
+/// Stored as a plain UserDefaults-backed flag (rather than @AppStorage) so it
+/// can be read from this non-View class.
+enum TunnelSound {
+    static let soundsEnabledKey = "tunnelSoundsEnabled"
+
+    static var isEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: soundsEnabledKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: soundsEnabledKey) }
+    }
+
+    @MainActor
+    static func playConnected() {
+        guard isEnabled else { return }
+        NSSound(named: "Pop")?.play()
+    }
+
+    @MainActor
+    static func playDisconnected() {
+        guard isEnabled else { return }
+        NSSound(named: "Basso")?.play()
+    }
+}
+
 
 /// File to store active PIDs for cleanup on crash/force quit
 private let pidFileURL: URL = {
@@ -244,13 +270,16 @@ class TunnelManager {
         arguments.append(host)
         arguments.append(contentsOf: [
             "-o", "ExitOnForwardFailure=yes",
-            "-o", "ServerAliveInterval=30",
-            "-o", "ServerAliveCountMax=3",
+            "-o", "ServerAliveInterval=\(tunnel.serverAliveInterval ?? Tunnel.defaultServerAliveInterval)",
+            "-o", "ServerAliveCountMax=\(tunnel.serverAliveCountMax ?? Tunnel.defaultServerAliveCountMax)",
             "-o", "RequestTTY=no",
             "-o", "RemoteCommand=none",
             "-o", "ControlMaster=no",
             "-o", "ControlPath=none"
         ])
+        if let connectTimeout = tunnel.connectTimeout {
+            arguments.append(contentsOf: ["-o", "ConnectTimeout=\(connectTimeout)"])
+        }
 
         process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
@@ -261,6 +290,7 @@ class TunnelManager {
             let pid = process.processIdentifier
             processIDs[tunnel.id] = pid
             connectionStatus[tunnel.id] = .connected
+            TunnelSound.playConnected()
 
             // Save PIDs to file for crash recovery
             updatePIDFile()
@@ -296,6 +326,7 @@ class TunnelManager {
         } else {
             connectionStatus[tunnelID] = .disconnected
         }
+        TunnelSound.playDisconnected()
         updatePIDFile()
     }
 
