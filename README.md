@@ -32,8 +32,10 @@ This app solves that. Configure once, connect with one click.
 ## Features
 
 - **Menu bar app** — always accessible, no dock icon clutter
-- **Multiple port forwards per tunnel** — one SSH connection, many `-L` mappings
+- **Multiple port forwards per tunnel** — one SSH connection, many `-L` / `-R` mappings
 - **SOCKS proxy** — per-mapping dynamic forwarding (`ssh -D`), mixable with local forwards
+- **Remote forwards** — expose a local service through the server (`ssh -R`) — a self-hosted way out
+- **Jump host** — reach a host behind a bastion (`ssh -J`), multi-hop chains included
 - **Group tunnels** — organize them with dividers and flip a whole group with one toggle
 - **Auto-reconnect** — tunnels automatically reconnect when they drop
 - **Failure reasons** — a failed or dropped tunnel shows *why* (auth, refused, unreachable, DNS, host-key change, port in use), not just "disconnected"
@@ -93,6 +95,28 @@ Use `socks5h://` when DNS should be resolved **on the server** — e.g. to reach
 curl -x socks5h://127.0.0.1:1080 http://internal-host:8080
 ```
 
+### Jump host (bastion)
+
+When a host has no public route and is only reachable through a bastion, set the target as the **Host** and the bastion as the **Jump Host** (in the tunnel's *Advanced* section). The app adds `ssh -J`, so the login is routed through the bastion while the forward still targets the final host — the jump host is only a login path, not part of the data flow.
+
+Example — reach a Postgres box `db.internal` that only the bastion can see:
+
+- **Host**: `db.internal`  **Jump Host**: `you@bastion.example.com`
+- **Local Forward**: Local `127.0.0.1:5432` → Remote `127.0.0.1:5432`
+
+Then point your client at `localhost:5432`. Chain multiple hops with commas: `you@bastion,you@inner-gateway`.
+
+### Remote forward (expose a local service)
+
+A **Remote Forward** (`ssh -R`) is the reverse of a local forward: the server listens on a port and sends connections back to your Mac — handy for showing a local site to the outside world through a public server, catching a webhook, or reverse SSH. As with the other types, **Local** is always this Mac and **Remote** is the server.
+
+Example — make a local site (`localhost:3000`) reachable at the server's public address:
+
+- **Host**: your public server
+- **Remote Forward**: Local `127.0.0.1:3000` → Remote `0.0.0.0:8080`
+
+Now `http://your-server:8080` reaches your Mac's `localhost:3000`. Binding to `0.0.0.0` (rather than the server's own loopback) needs **`GatewayPorts yes`** in the server's `sshd_config`; without it the port is reachable only from the server itself.
+
 ### Connection alerts
 
 The app can play a sound and/or show a notification when a tunnel connects or drops unexpectedly. Toggle them in **Preferences** (the gear in the sidebar footer) — sounds are on by default, notifications off. Manual disconnects and config edits stay silent; only genuine drops alert.
@@ -113,6 +137,7 @@ Each tunnel's detail view exposes a few SSH options for awkward hosts:
 - **Compression** (`-C`) — trade CPU for bandwidth on slow links.
 - **Survive brief network drops** — keep the tunnel up through short outages (`TCPKeepAlive=no`), relying on the keepalive probes above instead of TCP-level teardown.
 - **Skip host key check** — for hosts recreated on the same address. Insecure (disables host-key verification); off by default.
+- **Jump Host** (`-J`) — route the login through one or more bastions to reach the host. See [Jump host (bastion)](#jump-host-bastion) above.
 
 ## License
 
