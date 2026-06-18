@@ -7,7 +7,9 @@ struct TunnelDetailView: View {
     @FocusState private var focusedField: Field?
 
     @State private var editedTunnel: Tunnel
-    @State private var hasChanges = false
+    // Derived from the working copy vs the saved tunnel, so it can never drift
+    // out of sync with the actual edits (or with an immediate structural save).
+    private var hasChanges: Bool { editedTunnel != tunnel }
     // Jump host is a rare power-user knob — keep it collapsed by default so it
     // doesn't crowd the common case, but auto-expand it when one is already set.
     @State private var showJumpHost: Bool
@@ -326,12 +328,12 @@ struct TunnelDetailView: View {
                 .disabled(!hasChanges)
             }
         }
-        .onChange(of: editedTunnel) { _, _ in
-            hasChanges = true
-        }
-        .onChange(of: tunnel) { _, newValue in
-            editedTunnel = newValue
-            hasChanges = false
+        .onChange(of: tunnel.id) { _, _ in
+            // Reload the editor only when a *different* tunnel is selected — not
+            // when this tunnel's own save round-trips back through `tunnel`. The
+            // latter would clobber an edit made right after an auto-save (e.g.
+            // removing a port mapping just after a field blur saved the prior set).
+            editedTunnel = tunnel
         }
         .onChange(of: focusedField) { oldValue, newValue in
             if oldValue != nil && newValue != oldValue && hasChanges {
@@ -342,6 +344,9 @@ struct TunnelDetailView: View {
 
     private func removeMapping(_ id: UUID) {
         editedTunnel.portMappings.removeAll { $0.id == id }
+        // Persist right away so the sidebar and menu-bar summaries reflect the
+        // removal — a structural change shouldn't wait for a field blur to save.
+        saveChanges()
     }
 
     private func nextLocalPort() -> Int {
@@ -355,7 +360,6 @@ struct TunnelDetailView: View {
 
     private func saveChanges() {
         tunnelManager.updateTunnel(editedTunnel)
-        hasChanges = false
     }
 
     private func sshCommand(for tunnel: Tunnel) -> String {
