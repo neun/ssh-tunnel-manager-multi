@@ -10,22 +10,24 @@ struct TunnelDetailView: View {
     // Derived from the working copy vs the saved tunnel, so it can never drift
     // out of sync with the actual edits (or with an immediate structural save).
     private var hasChanges: Bool { editedTunnel != tunnel }
-    // Jump host is a rare power-user knob — keep it collapsed by default so it
-    // doesn't crowd the common case, but auto-expand it when one is already set.
+    // Rare power-user knobs — keep them collapsed by default so they don't crowd
+    // the common case, but auto-expand when one is already set.
     @State private var showJumpHost: Bool
+    @State private var showExtraOptions: Bool
 
     enum Field: Hashable {
         case name, host, port, identityFile, alias
         case mappingLocalHost(UUID), mappingLocalPort(UUID)
         case mappingRemoteHost(UUID), mappingRemotePort(UUID)
         case connectTimeout, aliveInterval, aliveCountMax
-        case proxyJump
+        case proxyJump, extraOptions
     }
 
     init(tunnel: Tunnel) {
         self.tunnel = tunnel
         self._editedTunnel = State(initialValue: tunnel)
         self._showJumpHost = State(initialValue: !(tunnel.proxyJump ?? "").isEmpty)
+        self._showExtraOptions = State(initialValue: !(tunnel.extraOptions ?? "").isEmpty)
     }
 
     private var status: ConnectionStatus {
@@ -147,6 +149,28 @@ struct TunnelDetailView: View {
                     Text("e.g., ~/.ssh/id_rsa")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+
+                DisclosureGroup(isExpanded: $showExtraOptions) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("e.g. -o ConnectTimeout=5", text: Binding(
+                            get: { editedTunnel.extraOptions ?? "" },
+                            set: { editedTunnel.extraOptions = $0.isEmpty ? nil : $0 }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .focused($focusedField, equals: .extraOptions)
+                        .help("Appended to the ssh command as-is, before the host. Split on spaces, so quoted values containing spaces won't survive.")
+
+                        Text("ssh flags the UI doesn't cover, space-separated, e.g. -o ConnectTimeout=5 -o Foo=bar.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 2)
+                } label: {
+                    Text("Extra SSH options")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onTapGesture { withAnimation { showExtraOptions.toggle() } }
                 }
 
                 DisclosureGroup(isExpanded: $showJumpHost) {
@@ -395,17 +419,18 @@ struct TunnelDetailView: View {
         if let proxyJump = tunnel.proxyJump?.trimmingCharacters(in: .whitespaces), !proxyJump.isEmpty {
             cmd += " -J \(proxyJump)"
         }
-        if tunnel.useAlias {
-            if tunnel.port != 22 {
-                cmd += " -p \(tunnel.port)"
-            }
-        } else {
+        // Host mode passes -p (non-default port only) and -i; alias mode lets
+        // ~/.ssh/config supply both. (issue #10)
+        if !tunnel.useAlias {
             if tunnel.port != 22 {
                 cmd += " -p \(tunnel.port)"
             }
             if let identityFile = tunnel.identityFile, !identityFile.isEmpty {
                 cmd += " -i \(identityFile) -o IdentitiesOnly=yes"
             }
+        }
+        if let extra = tunnel.extraOptions?.trimmingCharacters(in: .whitespaces), !extra.isEmpty {
+            cmd += " \(extra)"
         }
         cmd += " \(tunnel.host)"
         return cmd

@@ -38,7 +38,7 @@ This app solves that. Configure once, connect with one click.
 - **Failure reasons** — a failed or dropped tunnel shows *why* (auth, refused, unreachable, DNS, host-key change, port in use), not just "disconnected"
 - **Connect/disconnect alerts** — optional sound and notification when a tunnel drops or comes back
 - **Port-conflict guard** — warns when two tunnels want the same local port and stops them from clobbering each other
-- **Per-tunnel tuning** — `ConnectTimeout`, keepalive, compression, "survive brief network drops", and host-key options where a host needs them
+- **Per-tunnel tuning** — `ConnectTimeout`, keepalive, compression, "survive brief network drops", host-key options, and a free-text field for any other ssh flags
 - **SSH config aliases** — reuse hosts from your `~/.ssh/config`
 - **Launch at login** — start tunnels when your Mac boots
 - **Auto-connect** — mark tunnels to connect automatically on app launch
@@ -134,6 +134,7 @@ Each tunnel's detail view exposes a few SSH options for awkward hosts:
 - **Compression** (`-C`) — trade CPU for bandwidth on slow links.
 - **Survive brief network drops** — keep the tunnel up through short outages (`TCPKeepAlive=no`), relying on the keepalive probes above instead of TCP-level teardown.
 - **Skip host key check** — for hosts recreated on the same address. Insecure (disables host-key verification); off by default.
+- **Extra SSH options** — a free-text escape hatch for ssh flags the UI doesn't cover, e.g. `-o ConnectTimeout=5`. Appended to the command as-is, split on spaces.
 - **Jump Host** (`-J`) — route the login through one or more bastions to reach the host. See [Jump host (bastion)](#jump-host-bastion) above.
 
 ## License

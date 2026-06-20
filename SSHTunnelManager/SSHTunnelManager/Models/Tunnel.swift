@@ -81,6 +81,11 @@ struct Tunnel: Identifiable, Codable, Hashable {
     // nil/empty means "connect directly", matching today's behavior.
     var proxyJump: String?
 
+    // Extra ssh arguments appended verbatim (split on whitespace), e.g.
+    // "-o ConnectTimeout=5 -v". A power-user escape hatch for flags the UI
+    // doesn't expose. nil/empty adds nothing, matching today's behavior.
+    var extraOptions: String?
+
     /// Fallback used when a tunnel doesn't override `serverAliveInterval`.
     static let defaultServerAliveInterval = 30
     /// Fallback used when a tunnel doesn't override `serverAliveCountMax`.
@@ -101,7 +106,8 @@ struct Tunnel: Identifiable, Codable, Hashable {
         compression: Bool = false,
         disableTCPKeepAlive: Bool = false,
         skipHostKeyCheck: Bool = false,
-        proxyJump: String? = nil
+        proxyJump: String? = nil,
+        extraOptions: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -118,6 +124,7 @@ struct Tunnel: Identifiable, Codable, Hashable {
         self.disableTCPKeepAlive = disableTCPKeepAlive
         self.skipHostKeyCheck = skipHostKeyCheck
         self.proxyJump = proxyJump
+        self.extraOptions = extraOptions
     }
 
     /// True when `other` would produce the same `ssh` invocation as `self`.
@@ -134,13 +141,14 @@ struct Tunnel: Identifiable, Codable, Hashable {
         compression == other.compression &&
         disableTCPKeepAlive == other.disableTCPKeepAlive &&
         skipHostKeyCheck == other.skipHostKeyCheck &&
-        proxyJump == other.proxyJump
+        proxyJump == other.proxyJump &&
+        extraOptions == other.extraOptions
     }
 
     enum CodingKeys: String, CodingKey {
         case id, name, host, port, portMappings, identityFile, autoConnect, useAlias
         case connectTimeout, serverAliveInterval, serverAliveCountMax
-        case compression, disableTCPKeepAlive, skipHostKeyCheck, proxyJump
+        case compression, disableTCPKeepAlive, skipHostKeyCheck, proxyJump, extraOptions
         // Legacy single-mapping fields
         case localHost, localPort, remoteHost, remotePort
     }
@@ -165,6 +173,8 @@ struct Tunnel: Identifiable, Codable, Hashable {
         skipHostKeyCheck = try container.decodeIfPresent(Bool.self, forKey: .skipHostKeyCheck) ?? false
         // Absent in older configs — nil means "connect directly", i.e. no -J.
         proxyJump = try container.decodeIfPresent(String.self, forKey: .proxyJump)
+        // Absent in older configs — nil adds no extra arguments.
+        extraOptions = try container.decodeIfPresent(String.self, forKey: .extraOptions)
 
         if let mappings = try container.decodeIfPresent([PortMapping].self, forKey: .portMappings),
            !mappings.isEmpty {
@@ -201,6 +211,7 @@ struct Tunnel: Identifiable, Codable, Hashable {
         try container.encode(disableTCPKeepAlive, forKey: .disableTCPKeepAlive)
         try container.encode(skipHostKeyCheck, forKey: .skipHostKeyCheck)
         try container.encodeIfPresent(proxyJump, forKey: .proxyJump)
+        try container.encodeIfPresent(extraOptions, forKey: .extraOptions)
     }
 
     var mappingsSummary: String {

@@ -395,7 +395,11 @@ class TunnelManager {
             // authentication failures") before the right key is reached.
             arguments.append(contentsOf: ["-o", "IdentitiesOnly=yes"])
         }
-        if !tunnel.useAlias || tunnel.port != 22 {
+        // Only host mode passes -p, and only for a non-default port. In alias
+        // mode ~/.ssh/config supplies the port — otherwise a stale port left over
+        // from host mode (the field is hidden in alias mode) would silently
+        // override the alias. (issue #10)
+        if !tunnel.useAlias && tunnel.port != 22 {
             arguments.append(contentsOf: ["-p", "\(tunnel.port)"])
         }
         if tunnel.compression {
@@ -412,6 +416,12 @@ class TunnelManager {
         }
         if let proxyJump = tunnel.proxyJump?.trimmingCharacters(in: .whitespaces), !proxyJump.isEmpty {
             arguments.append(contentsOf: ["-J", proxyJump])
+        }
+        // User-supplied extra options, split on whitespace. A power-user escape
+        // hatch for flags the UI doesn't expose; goes before the destination so
+        // ssh parses them as options. (issue #9)
+        if let extra = tunnel.extraOptions?.trimmingCharacters(in: .whitespaces), !extra.isEmpty {
+            arguments.append(contentsOf: extra.split(whereSeparator: \.isWhitespace).map(String.init))
         }
 
         // Destination, then robustness/hardening options. Forcing a dedicated,
