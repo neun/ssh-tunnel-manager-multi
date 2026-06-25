@@ -36,12 +36,11 @@ jobs:
 
       - name: Create DMG
         run: |
-          mkdir -p dist
-          cp -R SSHTunnelManager/build/Build/Products/Release/SSHTunnelManager.app dist/
-          hdiutil create -volname "SSH Tunnel Manager" \
-            -srcfolder dist \
-            -ov -format UDZO \
-            SSHTunnelManager.dmg
+          python3 -m venv .dmgvenv
+          .dmgvenv/bin/pip install --quiet dmgbuild==1.6.7
+          DMG_APP="SSHTunnelManager/build/Build/Products/Release/SSHTunnelManager.app" \
+          DMG_BACKGROUND="$PWD/packaging/dmg-background.tiff" \
+            .dmgvenv/bin/dmgbuild -s packaging/dmg_settings.py "SSH Tunnel Manager" SSHTunnelManager.dmg
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
