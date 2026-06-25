@@ -140,3 +140,7 @@ Each tunnel's detail view exposes a few SSH options for awkward hosts:
 ## License
 
 MIT
+
+---
+
+<sub>Built with AI assistance and human review — every change is tested before release.</sub>
